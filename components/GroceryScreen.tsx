@@ -140,6 +140,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
     marginBottom: 20,
     flexWrap: 'wrap',
+    
     maxWidth: '100%',
   },
   productList: {
