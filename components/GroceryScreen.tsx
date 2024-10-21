@@ -1,8 +1,11 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ActivityIndicator, Platform, StatusBar, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useProducts } from '../hooks/useProducts';
+
+// Add this import at the top of the file
+import productImage from '../assets/coffe-1.jpg';
 
 const API_URL = 'https://simple-grocery-store-api.online/products';
 
@@ -30,7 +33,7 @@ const categories: Category[] = [
 
 const GroceryScreen = () => {
   const navigation = useNavigation();
-  const { products, loading, error } = useProducts(API_URL);
+  const { products, loading, error, isOffline } = useProducts(API_URL);
   const [selectedCategory, setSelectedCategory] = useState('All');
 
   const filteredProducts = useMemo(() => {
@@ -52,15 +55,23 @@ const GroceryScreen = () => {
     </TouchableOpacity>
   );
 
-  const renderProduct = ({ item, index }: { item: Product; index: number }) => (
-    <View style={[styles.productItem, { marginTop: index % 2 === 0 ? 0 : 20 }]}>
-      <View style={styles.productImage} />
-      <Text style={styles.productName}>{item.name}</Text>
-      <Text style={styles.productCategory}>{item.category}</Text>
-      <Text style={styles.productStock}>{item.inStock ? 'In Stock' : 'Out of Stock'}</Text>
-      <TouchableOpacity style={styles.addButton}>
-        <Ionicons name="add" size={24} color="white" />
-      </TouchableOpacity>
+  const renderProduct = ({ item, index }: { item: Product; index: number }) => {
+    return (
+      <View style={[styles.productItem, { marginTop: index % 2 === 0 ? 0 : 20 }]}>
+        <Image source={productImage} style={styles.productImage} resizeMode="cover" />
+        <Text style={styles.productName}>{item.name}</Text>
+        <Text style={styles.productCategory}>{item.category}</Text>
+        <Text style={styles.productStock}>{item.inStock ? 'In Stock' : 'Out of Stock'}</Text>
+        <TouchableOpacity style={styles.addButton}>
+          <Ionicons name="add" size={24} color="white" />
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderOfflineBar = () => (
+    <View style={styles.offlineBar}>
+      <Text style={styles.offlineText}>You are offline. Showing cached data.</Text>
     </View>
   );
 
@@ -68,14 +79,6 @@ const GroceryScreen = () => {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Error: {error}</Text>
       </View>
     );
   }
@@ -89,6 +92,7 @@ const GroceryScreen = () => {
         <Text style={styles.headerTitle}>Grocery</Text>
         <View style={{ width: 24 }} />
       </View>
+      {isOffline && renderOfflineBar()}
       <View style={styles.categoryContainer}>
         {categories.map((category) => (
           <View key={category.id}>
@@ -111,6 +115,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f0f0f0',
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   header: {
     flexDirection: 'row',
@@ -118,6 +123,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
     backgroundColor: 'white',
+    marginTop: 20,
   },
   headerTitle: {
     fontSize: 20,
@@ -163,6 +169,12 @@ const styles = StyleSheet.create({
   productImage: {
     width: '100%',
     height: 100,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  productImagePlaceholder: {
+    width: '100%',
+    height: 100,
     backgroundColor: '#f0f0f0',
     borderRadius: 10,
     marginBottom: 10,
@@ -203,6 +215,14 @@ const styles = StyleSheet.create({
   errorText: {
     color: 'red',
     fontSize: 16,
+  },
+  offlineBar: {
+    backgroundColor: '#f8d7da',
+    padding: 10,
+    alignItems: 'center',
+  },
+  offlineText: {
+    color: '#721c24',
   },
 });
 
