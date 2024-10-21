@@ -1,50 +1,84 @@
-import React from 'react';
-import { View, Text, StyleSheet, TextInput, FlatList, Image, TouchableOpacity, SafeAreaView } from 'react-native';
+import React, { useState, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useProducts } from '../hooks/useProducts';
 
-const categories = [
-  { id: '1', name: 'Fruits', icon: 'nutrition' },
-  { id: '2', name: 'Vegetables', icon: 'leaf' },
-  { id: '3', name: 'Bakery', icon: 'pizza' },
-  { id: '4', name: 'Milk', icon: 'water' },
-];
+const API_URL = 'https://simple-grocery-store-api.online/products';
 
-const products = [
-  { id: '1', name: 'Mango', price: 1.20, image: 'https://example.com/mango.jpg', discount: null },
-  { id: '2', name: 'Lemon', price: 0.80, image: 'https://example.com/lemon.jpg', discount: 50 },
-  { id: '3', name: 'Pineapple', price: 1.87, image: 'https://example.com/pineapple.jpg', discount: null },
-  { id: '4', name: 'Coconut', price: 1.87, image: 'https://example.com/coconut.jpg', discount: null },
-  { id: '5', name: 'Strawberry', price: 2.50, image: 'https://example.com/strawberry.jpg', discount: null },
+interface Category {
+  id: string;
+  name: string;
+  icon: string;
+  apiName: string;
+}
+
+interface Product {
+  id: number;
+  name: string;
+  category: string;
+  inStock: boolean;
+}
+
+const categories: Category[] = [
+  { id: '1', name: 'All', icon: 'grid-outline', apiName: 'all' },
+  { id: '2', name: 'Coffee', icon: 'cafe', apiName: 'coffee' },
+  { id: '3', name: 'Fresh Produce', icon: 'leaf', apiName: 'fresh-produce' },
+  { id: '4', name: 'Meat & Seafood', icon: 'fish', apiName: 'meat-seafood' },
+  { id: '5', name: 'Dairy', icon: 'water', apiName: 'dairy' },
 ];
 
 const GroceryScreen = () => {
   const navigation = useNavigation();
+  const { products, loading, error } = useProducts(API_URL);
+  const [selectedCategory, setSelectedCategory] = useState('All');
 
-  const renderCategory = ({ item }) => (
-    <TouchableOpacity style={styles.categoryItem}>
+  const filteredProducts = useMemo(() => {
+    if (selectedCategory === 'All') return products;
+    const category = categories.find(c => c.name === selectedCategory);
+    if (!category) return products;
+    return products.filter(product => product.category.toLowerCase() === category.apiName.toLowerCase());
+  }, [products, selectedCategory]);
+
+  const renderCategory = ({ item }: { item: Category }) => (
+    <TouchableOpacity 
+      style={[styles.categoryItem, selectedCategory === item.name && styles.selectedCategory]} 
+      onPress={() => setSelectedCategory(item.name)}
+    >
       <View style={styles.categoryIcon}>
-        <Ionicons name={item.icon} size={24} color="white" />
+        <Ionicons name={item.icon as any} size={24} color="white" />
       </View>
       <Text style={styles.categoryName}>{item.name}</Text>
     </TouchableOpacity>
   );
 
-  const renderProduct = ({ item, index }) => (
+  const renderProduct = ({ item, index }: { item: Product; index: number }) => (
     <View style={[styles.productItem, { marginTop: index % 2 === 0 ? 0 : 20 }]}>
-      <Image source={{ uri: item.image }} style={styles.productImage} />
-      {item.discount && (
-        <View style={styles.discountBadge}>
-          <Text style={styles.discountText}>{item.discount}% OFF</Text>
-        </View>
-      )}
+      <View style={styles.productImage} />
       <Text style={styles.productName}>{item.name}</Text>
-      <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
+      <Text style={styles.productCategory}>{item.category}</Text>
+      <Text style={styles.productStock}>{item.inStock ? 'In Stock' : 'Out of Stock'}</Text>
       <TouchableOpacity style={styles.addButton}>
         <Ionicons name="add" size={24} color="white" />
       </TouchableOpacity>
     </View>
   );
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Error: {error}</Text>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -53,33 +87,19 @@ const GroceryScreen = () => {
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Grocery</Text>
-        <TouchableOpacity>
-          <Ionicons name="cart-outline" size={24} color="black" />
-        </TouchableOpacity>
+        <View style={{ width: 24 }} />
       </View>
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="gray" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search for products"
-          placeholderTextColor="gray"
-        />
-        <TouchableOpacity>
-          <Ionicons name="options-outline" size={24} color="black" />
-        </TouchableOpacity>
+      <View style={styles.categoryContainer}>
+        {categories.map((category) => (
+          <View key={category.id}>
+            {renderCategory({ item: category })}
+          </View>
+        ))}
       </View>
       <FlatList
-        data={categories}
-        renderItem={renderCategory}
-        keyExtractor={(item) => item.id}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.categoryList}
-      />
-      <FlatList
-        data={products}
+        data={filteredProducts}
         renderItem={renderProduct}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id.toString()}
         numColumns={2}
         columnWrapperStyle={styles.productList}
       />
@@ -103,45 +123,31 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
-  searchContainer: {
+  categoryContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     backgroundColor: 'white',
-    borderRadius: 20,
-    margin: 16,
-    paddingHorizontal: 10,
-  },
-  searchIcon: {
-    marginRight: 5,
-  },
-  searchInput: {
-    flex: 1,
-    height: 40,
-  },
-  categoryList: {
-    paddingVertical: 20,
   },
   categoryItem: {
     alignItems: 'center',
-    marginHorizontal: 15,
-    height: 110,
-    justifyContent: 'space-between',
-    width: 80,
+    width: 70,
+  },
+  selectedCategory: {
+    backgroundColor: '#e8f5e9',
+    borderRadius: 10,
   },
   categoryIcon: {
     backgroundColor: '#4CAF50',
-    borderRadius: 30,
-    padding: 15,
-    marginBottom: 8,
+    borderRadius: 25,
+    padding: 10,
+    marginBottom: 5,
   },
   categoryName: {
     fontSize: 12,
     textAlign: 'center',
     marginTop: 5,
-    marginBottom: 20,
-    flexWrap: 'wrap',
-    
-    maxWidth: '100%',
   },
   productList: {
     justifyContent: 'space-between',
@@ -157,30 +163,24 @@ const styles = StyleSheet.create({
   productImage: {
     width: '100%',
     height: 100,
+    backgroundColor: '#f0f0f0',
     borderRadius: 10,
     marginBottom: 10,
   },
-  discountBadge: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: '#4CAF50',
-    borderRadius: 10,
-    padding: 5,
+  productCategory: {
+    fontSize: 12,
+    color: 'gray',
+    marginBottom: 5,
   },
-  discountText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: 'bold',
+  productStock: {
+    fontSize: 12,
+    color: '#4CAF50',
+    marginBottom: 5,
   },
   productName: {
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 5,
-  },
-  productPrice: {
-    fontSize: 14,
-    color: 'gray',
   },
   addButton: {
     position: 'absolute',
@@ -189,6 +189,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
     borderRadius: 15,
     padding: 5,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 16,
   },
 });
 
